@@ -1,0 +1,14 @@
+{
+  "name": "visa",
+  "version": "1.0.0",
+  "description": "An FFI module exposing the NI VISA library",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ffi": "^2.3.0"
+  }
+}
