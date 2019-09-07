@@ -3,13 +3,17 @@
 TODO:
 
 - Error handling. How we gonna do this? Return a status or just throw?
+- debug()
 
 */
 
 const
+	debug = require('debug')('ni-visa'),
 	ffi = require('ffi'),
 	ref = require('ref'),
 	os = require('os');
+
+const VI_ERROR = 0x80000000;
 
 /**
  * Create types like the ones in "visatype.h" from National Instruments
@@ -48,10 +52,11 @@ switch (os.platform()) {
 		dllName = os.arch() == 'x64' ? 'visa64.dll' : 'visa32.dll';
 		break;
 	default: 
-		throw new Exception('Unknown platform: ' + os.platform());
+		throw new Error('Unknown platform: ' + os.platform());
 }
 
-const prototypes = {
+// 'string' is used to reduce code, the FFI module will create Buffers as needed
+const libVisa = ffi.Library(dllName, {
 	// Resource Manager Functions and Operations
 	'viOpenDefaultRM': [ViStatus, [ViPSession]],
 	'viFindRsrc': [ViStatus, [ViSession, 'string', ViPFindList, ViPUInt32, 'string']],
@@ -59,26 +64,23 @@ const prototypes = {
 	'viOpen': [ViStatus, [ViSession, 'string', ViAccessMode, ViUInt32, ViPSession]],
 	// Resource Template Operations
 	'viClose': [ViStatus, [ViObject]],
-	/// Basic I/O Operations
+	// Basic I/O Operations
 	'viRead': [ViStatus, [ViSession, ViPBuf, ViUInt32, ViPUInt32]],
 	'viWrite': [ViStatus, [ViSession, 'string', ViUInt32, ViPUInt32]],
-};
-
-// 'string' is used to reduce code, the FFI lib will create Buffers as needed
-const libVisa = ffi.Library(dllName, prototypes);
+});
 
 function errorHandler (status) {
-	console.log('Warning: VISA Error: 0x' + (status >>> 0).toString(16).toUpperCase());
-	throw new Error();
+	if (status & 0x80000000) {
+		console.log('Warning: VISA Error: 0x' + (status >>> 0).toString(16).toUpperCase());
+		throw new Error();
+	}
 }
 
 function viOpenDefaultRM () {
 	let status;
 	let pSesn = ref.alloc(ViSession);
 	status = libVisa.viOpenDefaultRM(pSesn);
-	if (status) {
-		errorHandler(status);
-	}
+	errorHandler(status);
 	return [status, pSesn.deref()];
 }
 
@@ -88,9 +90,7 @@ function viFindRsrc (sesn, expr) {
 	let pRetcnt = ref.alloc(ViUInt32);
 	let instrDesc = Buffer.alloc(512);
 	status = libVisa.viFindRsrc(sesn, expr, pFindList, pRetcnt, instrDesc);
-	if (status) {
-		errorHandler(status);
-	}
+	errorHandler(status);
 	return [
 		status,
 		pFindList.deref(),
@@ -104,9 +104,7 @@ function viFindNext (findList) {
 	let status;
 	let instrDesc = Buffer.alloc(512);
 	status = libVisa.viFindNext(findList, instrDesc);
-	if (status) {
-		errorHandler(status);
-	}
+	errorHandler(status);
 	return [
 		status,
 		// Fake null-term string
@@ -118,40 +116,35 @@ function viOpen (sesn, rsrcName, accessMode=0, openTimeout=2000) {
 	let status;
 	let pVi = ref.alloc(ViSession);
 	status = libVisa.viOpen(sesn, rsrcName, accessMode, openTimeout, pVi);
-	if (status) {
-		errorHandler(status);
-	}
+	errorHandler(status);
 	return [status, pVi.deref()];
 }
 
 function viClose (vi) {
 	let status;
 	status = libVisa.viClose(vi);
-	if (status) {
-		errorHandler(status);
-	}
+	errorHandler(status);
 	return status;
 }
 
 // TODO ... assuming viRead always returns a string, probably wrong
 function viRead (vi, count=512) {
+	debug(`read (${count})`);
 	let status;
 	let buf = Buffer.alloc(count);
 	let pRetCount = ref.alloc(ViUInt32);
 	status = libVisa.viRead(vi, buf, buf.length, pRetCount)
-	if (status) {
-		errorHandler(status);
-	}
+	errorHandler(status);
 	return [status, ref.reinterpret(buf, pRetCount.deref(), 0).toString()];
 }
 
 function viWrite (vi, buf) {
+	debug('write:', buf);
 	let status;
 	let pRetCount = ref.alloc(ViUInt32);
 	status = libVisa.viWrite(vi, buf, buf.length, pRetCount)
-	if (status) {
-		errorHandler(status);
-	}
+	debug('write:status:', status);
+	errorHandler(status);
 	return [status, pRetCount.deref()];
 }
 
@@ -160,9 +153,12 @@ function viWrite (vi, buf) {
  * Error handling is left to the vi* functions.
  */
 
-function vhListResources (sesn) {
+/**
+ * Returns a list of strings of found resources
+ */
+function vhListResources (sesn, expr='?*') {
 	let descList = [];
-	let [status, findList, retcnt, instrDesc] = viFindRsrc(sesn, '?*');
+	let [status, findList, retcnt, instrDesc] = viFindRsrc(sesn, expr);
 	if (retcnt) {
 		descList.push(instrDesc);
 		for (let i = 1; i < retcnt; ++i) {
@@ -173,11 +169,16 @@ function vhListResources (sesn) {
 	return descList;
 }
 
+/**
+ * TODO: How are compound queries handled (reponsed to)
+ * Returns only the response, no status; status handled by error handler
+ */
 function vhQuery (vi, query) {
 	viWrite(vi, query);
 	return viRead(vi)[1];
 }
 
+// TODO: create this from the FFI object rather than retyping
 module.exports = {
 	// Resource Manager Functions and Operations
 	viOpenDefaultRM,
@@ -192,4 +193,6 @@ module.exports = {
 	// Helper functions
 	vhListResources,
 	vhQuery,
+	// Constants
+	VI_ERROR,
 }
