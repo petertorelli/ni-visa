@@ -9,11 +9,10 @@ TODO:
 
 const
 	debug = require('debug')('ni-visa'),
+	vcon = require('./ni-visa-constants.js'),
 	ffi = require('ffi'),
 	ref = require('ref'),
 	os = require('os');
-
-const VI_ERROR = 0x80000000;
 
 /**
  * Create types like the ones in "visatype.h" from National Instruments
@@ -70,7 +69,7 @@ const libVisa = ffi.Library(dllName, {
 });
 
 function errorHandler (status) {
-	if (status & 0x80000000) {
+	if (status & vcon.VI_ERROR) {
 		console.log('Warning: VISA Error: 0x' + (status >>> 0).toString(16).toUpperCase());
 		throw new Error();
 	}
@@ -138,6 +137,17 @@ function viRead (vi, count=512) {
 	return [status, ref.reinterpret(buf, pRetCount.deref(), 0).toString()];
 }
 
+// Returns the raw Buffer object
+function viReadRaw (vi, count=512) {
+	debug(`read (${count})`);
+	let status;
+	let buf = Buffer.alloc(count);
+	let pRetCount = ref.alloc(ViUInt32);
+	status = libVisa.viRead(vi, buf, buf.length, pRetCount)
+	errorHandler(status);
+	return [status, buf];
+}
+
 function viWrite (vi, buf) {
 	debug('write:', buf);
 	let status;
@@ -189,10 +199,9 @@ module.exports = {
 	viClose,
 	/// Basic I/O Operations
 	viRead,
+	viReadRaw,
 	viWrite,
 	// Helper functions
 	vhListResources,
 	vhQuery,
-	// Constants
-	VI_ERROR,
 }

@@ -1,6 +1,6 @@
 // Constants for the VISA Library 5.8 Specification
 
-module.exports = {
+const constants = {
 
 	VI_ERROR: (0x80000000),
 
@@ -639,4 +639,31 @@ module.exports = {
 	VI_ATTR_FIREWIRE_UPPER_CHIP_ID: (0x3FFF01F5),
 
 	VI_FIREWIRE_DFLT_SPACE: (5),
+};
+
+/**
+ * Only works for SUCCESS, WARN, ERROR since they are unique. Also need to 
+ * convert signed since es6 doesn't interpret bit 31 as the sign bit natively,
+ * e.g.:
+ * 0xBFFF000E = 0x80000000 + 0x3FFF000E = VI_ERROR_INV_OBJECT
+ *            = 3221159950
+ *            = -1073807346
+ */
+function decodeStatus (code) {
+	let key;
+	Object.keys(constants).some((x, y) => {
+		if (x.match(/^VI_(SUCCESS|WARN|ERROR)/)) {
+			if (code == constants[x]) {
+				key = x;
+				return true;
+			}
+		}
+		return false;
+	});
+	return key;
+}
+
+module.exports = {
+	constants,
+	decodeStatus,
 };
