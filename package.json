@@ -6,8 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "EEMBC License",
+  "author": "Peter Torelli <peter@petertorelli.com>",
+  "license": "Apache 2.0",
   "dependencies": {
     "debug": "^4.1.1",
     "ffi": "^2.3.0"
