@@ -4,6 +4,8 @@ This is a Node.JS wrapper for the National Instruments [VISA (Virtual Instrument
 
 The library is [available](https://www.ni.com/visa/) from National Instruments for Windows and macOS, and supports GPIB, USB, Serial, Ethernet, VXI and PXI interfaces.
 
+The sample `test.js` uses the module `n6705b` which supports data collection from a 6781 power module to perform data collection.
+
 # Wrapping
 
 This implementation uses `ffi` to export wrapper functions.
@@ -13,7 +15,8 @@ This implementation uses `ffi` to export wrapper functions.
 1. Error handling - provide an interface for a custom error handler
 2. Solve the FFI DynamicLibrary issue (it appends the .dylib library suffix which breaks on recent macOS)
 3. Make it more "npm package-y"
-4. Implement the full v19 API (and constants!)
+4. Implement the full v19 API, not just the basic functions
+5. NI doesn't support linux, would be nice to write a raw VISA interface using the NodeJS 'usb' module.
 
 
 # Thanks
