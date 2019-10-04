@@ -13,7 +13,8 @@ This implementation uses `ffi` to export wrapper functions.
 1. Error handling - provide an interface for a custom error handler
 2. Solve the FFI DynamicLibrary issue (it appends the .dylib library suffix which breaks on recent macOS)
 3. Make it more "npm package-y"
-4. Implement the full v19 API (and constants!)
+4. Implement the full v19 API, not just the basic functions
+5. NI doesn't support linux, would be nice to write a raw VISA interface using the NodeJS 'usb' module.
 
 
 # Thanks
