@@ -26,11 +26,16 @@ const ViInt32 = ref.types.int32;
 const ViPInt32 = ref.refType(ViInt32);
 const ViUInt32 = ref.types.uint32;
 const ViPUInt32 = ref.refType(ViUInt32);
+const ViInt16 = ref.types.int16;
+const ViPInt16 = ref.refType(ViInt16);
+const ViUInt16 = ref.types.uint16;
+const ViPUInt16 = ref.refType(ViUInt16);
 const ViChar = ref.types.char;
 const ViPChar = ref.refType(ViChar);
 const ViByte = ref.types.uchar;
 const ViPByte = ref.refType(ViByte);
-const ViStatus = ViInt32;
+// Note, this needs to be ViUInt32, not ViInt32 other we get negative hex
+const ViStatus = ViUInt32;
 const ViObject = ViUInt32;
 const ViSession = ViUInt32;
 const ViPSession = ref.refType(ViSession);
@@ -65,11 +70,14 @@ const libVisa = ffi.Library(dllName, {
 	'viOpenDefaultRM': [ViStatus, [ViPSession]],
 	'viFindRsrc': [ViStatus, [ViSession, 'string', ViPFindList, ViPUInt32, 'string']],
 	'viFindNext': [ViStatus, [ViFindList, 'string']],
+	'viParseRsrc': [ViStatus, [ViSession, 'string', ViPUInt16, ViPUInt16]],
+	'viParseRsrcEx': [ViStatus, [ViSession, 'string', ViPUInt16, ViPUInt16, 'string', 'string', 'string']],
 	'viOpen': [ViStatus, [ViSession, 'string', ViAccessMode, ViUInt32, ViPSession]],
 	// Resource Template Operations
 	'viClose': [ViStatus, [ViObject]],
 	// Basic I/O Operations
 	'viRead': [ViStatus, [ViSession, ViPBuf, ViUInt32, ViPUInt32]],
+	'viReadToFile': [ViStatus, [ViSession, 'string', ViUInt32, ViPUInt32]],
 	'viWrite': [ViStatus, [ViSession, 'string', ViUInt32, ViPUInt32]],
 });
 
@@ -126,6 +134,44 @@ function viFindNext (findList) {
 	];
 }
 
+function viParseRsrc (sesn, rsrcName) {
+	let status;
+	let pIntfType = ref.alloc(ViUInt16);
+	let pIntfNum = ref.alloc(ViUInt16);
+	status = libVisa.viParseRsrc(sesn, rsrcName, pIntfType, pIntfNum);
+	statusCheck(status);
+	return [
+		status,
+		// This is a VI_INTF_* define
+		pIntfType.deref(),
+		// This is the board #
+		pIntfNum.deref()
+	];
+}
+
+// TODO: Untested, I don't hardware that responds to this call
+function viParseRsrcEx (sesn, rsrcName) {
+	let status;
+	let pIntfType = ref.alloc(ViUInt16);
+	let pIntfNum = ref.alloc(ViUInt16);
+	let rsrcClass = Buffer.alloc(512);
+	let expandedUnaliasedName = Buffer.alloc(512);
+	let aliasIfExists = Buffer.alloc(512);
+	status = libVisa.viParseRsrcEx(sesn, rsrcName, pIntfType, pIntfNum,
+		rsrcClass, expandedUnaliasedName, aliasIfExists);
+	statusCheck(status);
+	return [
+		status,
+		// This is a VI_INTF_* define
+		pIntfType.deref(),
+		// This is the board #
+		pIntfNum.deref(),
+		rsrcClass.toString('ascii', 0, rsrcClass.indexOf(0)),
+		expandedUnaliasedName.toString('ascii', 0, expandedUnaliasedName.indexOf(0)),
+		aliasIfExists.toString('ascii', 0, aliasIfExists.indexOf(0))
+	];
+}
+
 function viOpen (sesn, rsrcName, accessMode=0, openTimeout=2000) {
 	let status;
 	let pVi = ref.alloc(ViSession);
@@ -161,6 +207,16 @@ function viReadRaw (vi, count=512) {
 	statusCheck(status);
 	debug(`readRaw: (${count}) -> ${pRetCount.deref()}`);
 	return [status, buf.slice(0, pRetCount.deref())];
+}
+
+//	'viReadToFile': [ViStatus, [ViSession, 'string', ViUInt32, ViPUInt32]],
+function viReadToFile (vi, fileName, count) {
+	let status;
+	let pRetCount = ref.alloc(ViUInt32);
+	status = libVisa.viReadToFile(vi, fileName, count, pRetCount);
+	statusCheck(status);
+	debug(`readToFile (${count}) -> ${pRetCount.deref()}`);
+	return [status];
 }
 
 function viWrite (vi, buf) {
@@ -212,12 +268,15 @@ module.exports = {
 	viOpenDefaultRM,
 	viFindRsrc,
 	viFindNext,
+	viParseRsrc,
+	viParseRsrcEx,
 	viOpen,
 	// Resource Template Operations
 	viClose,
 	/// Basic I/O Operations
 	viRead,
 	viReadRaw,
+	viReadToFile,
 	viWrite,
 	// Helper functions
 	vhListResources,

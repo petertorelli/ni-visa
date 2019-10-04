@@ -211,6 +211,24 @@ KeysightN6705B.prototype.downloadData = function () {
 	return buffer.slice(offset,  buffer.length);
 }
 
+KeysightN6705B.prototype.downloadData2 = function () {
+	debug('downloadData');
+	let resp;
+	let status;
+	this.off();
+	resp = visa.vhQuery(this.inst, 'MMEM:ATTR? "internal:\\data1.dlog", "FileSize"');
+	// TODO: Odd, why suddenly are there quotes in the response?
+	resp = resp.replace(/"/g, '');
+	let bytes = parseInt(resp);
+	debug(`File ${DEFAULT_LOG_FILE} size is ${bytes} bytes`);
+	let buffer = Buffer.alloc(0);
+	visa.viWrite(this.inst, `MMEM:DATA:DEF? "${DEFAULT_LOG_FILE}"`)
+	// TODO: Load the ENTIRE file into memory could be a bad idea in the future
+	const start = process.hrtime();
+	let retCount;
+	[status, retCount] = visa.viReadToFile(this.inst, "test.blarg", bytes);
+}
+
 KeysightN6705B.prototype.off = function () {
 	debug('off');
 	visa.viWrite(this.inst, 'OUTP OFF,(@1,2)');

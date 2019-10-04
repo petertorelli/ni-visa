@@ -41,7 +41,23 @@ async function main_p () {
 	}
 }
 
+async function main2_p () {
+	try {
+		let ks = new n6705b();
+		ks.init();
+		[actualVolts, actualPeriodS] = await ks.setup_p(3.0, 1/20e-6);
+		actualTimeS = await ks.timeAcquire_p(sampleTime);
+		ks.selfTrigger();
+		await pause(11);
+		ks.off();
+		await pause(1);
+		let data = ks.downloadData2();
+	} catch (error) {
+		console.error(error.stack);
+	}
+}
+
 // 12   sec @ 1 khz = 300   ms
 //  3.0 sec @ 1 khz = 102   ms
 //  1.5 sec @ 1 khz =  66.6 ms
-main_p();
+main2_p();
