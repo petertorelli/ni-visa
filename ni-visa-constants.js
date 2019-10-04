@@ -1,4 +1,10 @@
-// Constants for the VISA Library 5.8 Specification
+/**
+ * Copyright (C) Peter Torelli
+ *
+ * Licensed under Apache 2.0
+ * 
+ * Constants for the VISA Library 5.8 Specification by National Instruments
+ */
 
 const constants = {
 
@@ -648,9 +654,10 @@ const constants = {
  * 0xBFFF000E = 0x80000000 + 0x3FFF000E = VI_ERROR_INV_OBJECT
  *            = 3221159950
  *            = -1073807346
+ * Returns text string or null
  */
 function decodeStatus (code) {
-	let key;
+	let key = null;
 	Object.keys(constants).some((x, y) => {
 		if (x.match(/^VI_(SUCCESS|WARN|ERROR)/)) {
 			if (code == constants[x]) {

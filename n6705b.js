@@ -1,22 +1,26 @@
 /**
- * EEMBC implementation of N6705B control for IoTConnect frameworks.
+ * Copyright (C) Peter Torelli
  *
- * Copyright (c) EEMBC
- *
- * Original author: P.Torelli (based on Python code by S.Allen/Dialog)
+ * Licensed under Apache 2.0
+ * 
+ * Interface implementation for Keysight N6705B
  */
 
 /**
+ * TODO List:
+ *
  * TODO: How do we turn off the emon after sampling automatically?
  * TODO: Should there be checks to prevent triggering if init() hasn't been
  *       called? (e.g., this.ready)
+ * TODO: SCPI error-handling is dodgy: rather than send a RESP, I have to check
+ *       the panel of the Keysight for an error. Really?
  */
 
 const
 	visa = require('./ni-visa.js'),
 	vcon = require('./ni-visa-constants.js'),
 	pause = require('./pause.js'),
-	debug = require('debug')('n6705b'),
+	debug = require('debug')('emon'),
 	util = require('util')
 
 const MIN_PERIOD_S = 20e-6;
@@ -152,17 +156,13 @@ KeysightN6705B.prototype.setup_p = async function (voltageV=3.0, rateHz=1000) {
  */
 KeysightN6705B.prototype.timeAcquire_p = async function (timeS=10) {
 	debug('timeAcquire_p');
-	// TODO this needs to be EXTernal for the BNC backpanel input
+	// TODO This needs to be EXTernal for the BNC backpanel input
 	visa.viWrite(this.inst, 'TRIG:DLOG:SOUR BUS');
 	visa.viWrite(this.inst, `SENS:DLOG:TIME ${timeS}`);
 	resp = visa.vhQuery(this.inst, 'SENS:DLOG:TIME?')
 	let actualTimeS = parseFloat(resp);
-	// TODO: Recommended by Steve Allen
-	await pause(0.5);
-	// TODO: How do we tell if we run out of disk space?
+	// TODO How do we tell if we run out of disk space?
 	visa.viWrite(this.inst, 'INIT:DLOG "internal:\\data1.dlog"')
-	// TODO: Recommended by Steve Allen
-	await pause(0.5);
 	return actualTimeS;
 }
 
@@ -173,6 +173,7 @@ KeysightN6705B.prototype.selfTrigger = function () {
 KeysightN6705B.prototype.downloadData = function () {
 	debug('downloadData');
 	let resp;
+	let status;
 	this.off();
 	resp = visa.vhQuery(this.inst, 'MMEM:ATTR? "internal:\\data1.dlog", "FileSize"');
 	// TODO: Odd, why suddenly are there quotes in the response?
@@ -180,29 +181,34 @@ KeysightN6705B.prototype.downloadData = function () {
 	let bytes = parseInt(resp);
 	debug(`File ${DEFAULT_LOG_FILE} size is ${bytes} bytes`);
 	let buffer = Buffer.alloc(0);
-	visa.viWrite(this.inst, `MMEM:DATA? "${DEFAULT_LOG_FILE}"`)
-	let status;
+	visa.viWrite(this.inst, `MMEM:DATA:DEF? "${DEFAULT_LOG_FILE}"`)
 	// TODO: Load the ENTIRE file into memory could be a bad idea in the future
-	let check = 0;
+	const start = process.hrtime();
 	do {
-		[status, resp] = visa.viReadRaw(this.inst);
-		console.log(resp.toString());
-		console.log(status.toString(16), resp.length);
-		check += resp.length;
+		[status, resp] = visa.viReadRaw(this.inst, 512);
 		buffer = Buffer.concat([buffer, resp], buffer.length + resp.length)
+		if (status & vcon.VI_ERROR) {
+			throw new Error("Error reading dlog file", status.toString(16));
+		}
 	} while (status && !(status & vcon.VI_ERROR));
-	console.log('status      ', status)
-	console.log('buffer sum  ', check);
+	const diff = process.hrtime(start);
+	const sec = diff[1] / 1e9 + diff[0];
+	const tpt = (buffer.length / 1024) / sec;
+	debug('bytes read  ', buffer.length);
+	debug('FileSize?   ', bytes);
+	debug('speed       ', tpt.toPrecision(3), 'KB/s');
 	// Fast-forward past the header
-	let startRaw = buffer.indexOf('</dlog>\n') + '</dlog>\n'.length;
-	if (startRaw === 0) {
+	let offset = buffer.indexOf('</dlog>\n') + '</dlog>\n'.length;
+	if (offset === 0) {
 		throw new Error('Failed to find start of binary data');
 	}
 	// The 8 bytes after the header are also not needed
-	console.log('first dword ', buffer.readUInt32BE(startRaw));
-	console.log('scnd dword  ', buffer.readUInt32BE(startRaw + 4));
-	console.log("Skip bytes = ", startRaw + 8);
-	return buffer.slice(startRaw + 8, bytes);
+	debug('1st dword   ', buffer.readUInt32BE(offset).toString(16));
+	debug('2nd dword   ', buffer.readUInt32BE(offset + 4).toString(16));
+	offset += 8;
+	debug('Offset      ', offset, 'B');
+	// BUGBUG: Often more bytes are sent back than there are in the file, why?
+	return buffer.slice(offset,  buffer.length);
 }
 
 KeysightN6705B.prototype.off = function () {

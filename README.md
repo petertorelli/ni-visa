@@ -11,6 +11,11 @@ This implementation uses `ffi` to export wrapper functions.
 # TODO
 
 1. Error handling - provide an interface for a custom error handler
-2. Solve the FFI DynamicLibrary issue (it appends the .dylib library suffix which breaks macOS)
+2. Solve the FFI DynamicLibrary issue (it appends the .dylib library suffix which breaks on recent macOS)
 3. Make it more "npm package-y"
 4. Implement the full v19 API (and constants!)
+
+
+# Thanks
+
+Originally inspired by Jürgen Skrotzky's [visa32 project](https://github.com/Jorgen-VikingGod/visa32).

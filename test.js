@@ -1,10 +1,18 @@
-let
+/**
+ * Copyright (C) Peter Torelli
+ *
+ * Licensed under Apache 2.0
+ * 
+ * Just a test area.
+ */
+
+ let
 	visa = require('./ni-visa.js'),
 	vcon = require('./ni-visa-constants.js'),
 	n6705b = require('./n6705b.js'),
 	pause = require('./pause.js')
 
-let sampleTime = 10;
+let sampleTime = 6;
 async function main_p () {
 	try {
 		let ks = new n6705b();
@@ -12,20 +20,22 @@ async function main_p () {
 		[actualVolts, actualPeriodS] = await ks.setup_p(3.0, 1/20e-6);
 		actualTimeS = await ks.timeAcquire_p(sampleTime);
 		ks.selfTrigger();
-		await pause(actualTimeS + 1);
+		await pause(11);
 		ks.off();
+		await pause(1);
 		let data = ks.downloadData();
 		console.log('Total bytes sampled', data.length);
 		console.log('Total samples', data.length / 4);
 		ks.close();
 		console.log(`Voltage ${actualVolts} V, Period ${actualPeriodS * 1e6} usec.`);
 		let energy = 0;
-		for (let i=0, j=0; i<data.length; i+=4, j+=actualPeriodS) {
-			console.log(j, data.readFloatBE(i));
+		// why always 1 byte off
+		for (let i=0, j=0; i<data.length-4; i+=4, j+=actualPeriodS) {
+			//console.log(i, j, data.readFloatBE(i));
 			energy += (actualVolts * data.readFloatBE(i)) * actualPeriodS;
 		}
 		console.log(data.length);
-		console.log(energy, data.length / 4 * actualPeriodS);
+		console.log((energy * 1e6).toPrecision(3), (data.length / 4 * actualPeriodS).toPrecision(3));
 	} catch (error) {
 		console.error(error.stack);
 	}

@@ -1,11 +1,16 @@
-/*
+/**
+ * Copyright (C) Peter Torelli
+ *
+ * Licensed under Apache 2.0
+ * 
+ * Interface wrapper to the VISA dynamic library.
+ */
 
-TODO:
-
-- Error handling. How we gonna do this? Return a status or just throw?
-- debug()
-
-*/
+/**
+ * TODO List
+ *
+ * TODO: Error handling. Throw? Return status? How should we do this?
+ */
 
 const
 	debug = require('debug')('ni-visa'),
@@ -68,10 +73,20 @@ const libVisa = ffi.Library(dllName, {
 	'viWrite': [ViStatus, [ViSession, 'string', ViUInt32, ViPUInt32]],
 });
 
-function errorHandler (status) {
+// TODO: since error handling is undecided, every function calls this
+function statusCheck (status) {
 	if (status & vcon.VI_ERROR) {
 		console.log('Warning: VISA Error: 0x' + (status >>> 0).toString(16).toUpperCase());
 		throw new Error();
+	} else {
+		if (status) {
+			let str = vcon.decodeStatus(status);
+			if (str != null) {
+				debug(`non-error status check: ${status.toString(16)} ${str}`);
+			} else {
+				debug(`non-error status check: ${status.toString(16)}`);
+			}
+		}
 	}
 }
 
@@ -79,7 +94,7 @@ function viOpenDefaultRM () {
 	let status;
 	let pSesn = ref.alloc(ViSession);
 	status = libVisa.viOpenDefaultRM(pSesn);
-	errorHandler(status);
+	statusCheck(status);
 	return [status, pSesn.deref()];
 }
 
@@ -89,7 +104,7 @@ function viFindRsrc (sesn, expr) {
 	let pRetcnt = ref.alloc(ViUInt32);
 	let instrDesc = Buffer.alloc(512);
 	status = libVisa.viFindRsrc(sesn, expr, pFindList, pRetcnt, instrDesc);
-	errorHandler(status);
+	statusCheck(status);
 	return [
 		status,
 		pFindList.deref(),
@@ -103,7 +118,7 @@ function viFindNext (findList) {
 	let status;
 	let instrDesc = Buffer.alloc(512);
 	status = libVisa.viFindNext(findList, instrDesc);
-	errorHandler(status);
+	statusCheck(status);
 	return [
 		status,
 		// Fake null-term string
@@ -115,37 +130,37 @@ function viOpen (sesn, rsrcName, accessMode=0, openTimeout=2000) {
 	let status;
 	let pVi = ref.alloc(ViSession);
 	status = libVisa.viOpen(sesn, rsrcName, accessMode, openTimeout, pVi);
-	errorHandler(status);
+	statusCheck(status);
 	return [status, pVi.deref()];
 }
 
 function viClose (vi) {
 	let status;
 	status = libVisa.viClose(vi);
-	errorHandler(status);
+	statusCheck(status);
 	return status;
 }
 
 // TODO ... assuming viRead always returns a string, probably wrong
 function viRead (vi, count=512) {
-	debug(`read (${count})`);
 	let status;
 	let buf = Buffer.alloc(count);
 	let pRetCount = ref.alloc(ViUInt32);
 	status = libVisa.viRead(vi, buf, buf.length, pRetCount)
-	errorHandler(status);
+	statusCheck(status);
+	debug(`read (${count}) -> ${pRetCount.deref()}`);
 	return [status, ref.reinterpret(buf, pRetCount.deref(), 0).toString()];
 }
 
-// Returns the raw Buffer object
+// Returns the raw Buffer object rather than a decoded string
 function viReadRaw (vi, count=512) {
-	debug(`read (${count})`);
 	let status;
 	let buf = Buffer.alloc(count);
 	let pRetCount = ref.alloc(ViUInt32);
 	status = libVisa.viRead(vi, buf, buf.length, pRetCount)
-	errorHandler(status);
-	return [status, buf];
+	statusCheck(status);
+	debug(`readRaw: (${count}) -> ${pRetCount.deref()}`);
+	return [status, buf.slice(0, pRetCount.deref())];
 }
 
 function viWrite (vi, buf) {
@@ -153,8 +168,10 @@ function viWrite (vi, buf) {
 	let status;
 	let pRetCount = ref.alloc(ViUInt32);
 	status = libVisa.viWrite(vi, buf, buf.length, pRetCount)
-	debug('write:status:', status);
-	errorHandler(status);
+	statusCheck(status);
+	if (pRetCount.deref() != buf.length) {
+		throw new Error('viWrite length fail')
+	}
 	return [status, pRetCount.deref()];
 }
 
@@ -185,6 +202,7 @@ function vhListResources (sesn, expr='?*') {
  */
 function vhQuery (vi, query) {
 	viWrite(vi, query);
+	// TODO: return status as well?
 	return viRead(vi)[1];
 }
 
