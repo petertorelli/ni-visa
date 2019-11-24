@@ -57,6 +57,9 @@ switch (os.platform()) {
 	case 'darwin':
 		dllName = 'visa.framework/visa';
 		break;
+	case 'linux':
+		dllName = 'librsvisa';
+		break;
 	case 'win32':
 		dllName = os.arch() == 'x64' ? 'visa64.dll' : 'visa32.dll';
 		break;
@@ -226,7 +229,7 @@ function viWrite (vi, buf) {
 	status = libVisa.viWrite(vi, buf, buf.length, pRetCount)
 	statusCheck(status);
 	if (pRetCount.deref() != buf.length) {
-		throw new Error('viWrite length fail')
+		throw new Error('viWrite length fail' + `: ${pRetCount.deref()} vs ${buf.length}`)
 	}
 	return [status, pRetCount.deref()];
 }
