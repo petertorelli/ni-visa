@@ -1,3 +1,7 @@
+# Update
+
+[Jürgen](https://github.com/Jorgen-VikingGod) pointed me to the [Rohde-Schwartz drivers](https://www.rohde-schwarz.com/de/applikationen/r-s-visa-application-note_56280-148812.html) which are open-source and work on Windows, macOS and Linux (including Raspbian)!
+
 # About
 
 This is a Node.JS wrapper for the National Instruments [VISA (Virtual Instrument Software Architecture)](https://en.wikipedia.org/wiki/Standard_Commands_for_Programmable_Instruments) library. The VISA library implements the [SCPI (Standard Commands for Programmable Instruments)](https://en.wikipedia.org/wiki/Standard_Commands_for_Programmable_Instruments) syntax and commands.
@@ -16,7 +20,6 @@ This implementation uses `ffi` to export wrapper functions.
 2. Solve the FFI DynamicLibrary issue (it appends the .dylib library suffix which breaks on recent macOS)
 3. Make it more "npm package-y"
 4. Implement the full v19 API, not just the basic functions
-5. NI doesn't support linux, would be nice to write a raw VISA interface using the NodeJS 'usb' module.
 
 
 # Thanks
