@@ -9,7 +9,7 @@
   "author": "Peter Torelli <peter@petertorelli.com>",
   "license": "Apache 2.0",
   "dependencies": {
-    "debug": "^4.1.1",
+    "debug": "^4.3.1",
     "ffi": "^2.3.0",
     "sprintf-js": "^1.1.2"
   }
